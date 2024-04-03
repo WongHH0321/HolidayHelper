@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Holiday Helper</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width,initial-scale=1">
+        <script src="https://polyfill.io/v3/polyfill.min.js?features=default"></script>
+        <script src="https://ajax.googleapis.com/ajax/libs/handlebars/4.7.7/handlebars.min.js"></script>
+        <link href="https://fonts.googleapis.com/css?family=Roboto" rel="stylesheet"/>
+        <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" />
+        <link href="neighborhood.css" rel="stylesheet">
+        <script src="neighborhood.js"></script>
+        
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+
+        <style>
+            .search-container {
+                font-family: Roboto;
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 115px;
+                background-color: #ffffff;
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+                z-index: 9999;
+            }
+
+            .search-container input[type="text"] {
+                padding: 10px;
+                border: none;
+                width: 300px;
+                border-radius: 5px;
+                margin: 10px;
+                font-size: 16px;
+            }
+
+            .search-container button {
+                padding: 10px 20px;
+                background-color: #4caf50;
+                border: none;
+                color: #ffffff;
+                border-radius: 5px;
+                font-size: 16px;
+                cursor: pointer;
+            }
+
+            .search-container button:hover {
+                background-color: #45a049;
+            }
+
+            .content {
+                margin-top: 80px;
+                padding: 20px;
+            }
+
+            td{
+                width: 1000px;
+            }
+            @font-face {
+                font-family: 'KentuckyFriedFont';
+                src: url('path/to/your/font-file.woff2') format('woff2');
+            }
+        </style>
+
+        <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB5EO5leBaHOUmiSMyIjFfabL6an_kkSqE&libraries=places"></script>
+
+        <!-- WeatherBit API -->
+        <script src="weatherBit.js"></script>
+        <!-- TimeZoneDB API -->
+        <script src="timeZoneDB.js"></script>
+        <!-- Youtube API -->
+        <script src="youtube.js"></script>
+        <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+        <script>
+            function initAutocomplete() {
+                var input = document.getElementById('addressInput');
+                var autocomplete = new google.maps.places.Autocomplete(input);
+            }
+
+            function getNearbyPlaces() {
+
+
+                var address = document.getElementById('addressInput').value;
+                var types = getSelectedTypes() // Get the type input from the user
+                var radius = document.getElementById('radiusInput').value;
+
+                // Clear the previous results
+                var resultsList = document.querySelector('.place-results-list');
+                resultsList.innerHTML = '';
+
+
+                var geocoder = new google.maps.Geocoder();
+                geocoder.geocode({'address': address}, function (results, status) {
+                    if (status === 'OK') {
+                        var location = results[0].geometry.location;
+                        var latitude = location.lat();
+                        var longitude = location.lng();
+
+                        // Use the latitude and longitude as needed
+                        console.log('Latitude:', latitude);
+                        console.log('Longitude:', longitude);
+
+                        var request = {
+                            location: location,
+                            radius: parseInt(radius),
+                            type: types
+                        };
+
+                        var service = new google.maps.places.PlacesService(document.createElement('div'));
+                        service.nearbySearch(request, function (results, status) {
+                            if (status === 'OK') {
+                                var placeIds = results.map(function (place) {
+                                    return place.place_id;
+                                });
+
+                                insertPlaceIds(placeIds);
+                            }
+                        });
+                    }
+                });
+                getTimezone();
+                fetchWeatherForecast();
+                submitForm(event);
+            }
+
+            function getSelectedTypes() {
+                var types = [];
+                var checkboxes = document.getElementsByName('placeType');
+
+                checkboxes.forEach(function (checkbox) {
+                    if (checkbox.checked) {
+                        types.push(checkbox.value);
+                    }
+                });
+
+                return types;
+            }
+
+            function insertPlaceIds(placeIds) {
+                // Access the pois array in the CONFIGURATION object
+                var pois = CONFIGURATION.pois;
+
+                // Remove existing place IDs from the pois array
+                pois.length = 0;
+
+                // Insert the new place IDs into the pois array
+                placeIds.forEach(function (placeId) {
+                    pois.push({"placeId": placeId});
+                });
+
+                // Re-initialize the map to reflect the updated place IDs
+                initMap();
+            }
+
+        </script>
+        <script>
+            const CONFIGURATION = {
+                "capabilities": {"search": true, "distances": false, "directions": false, "contacts": true, "atmospheres": true, "thumbnails": true},
+                "pois": [],
+                "mapRadius": 300000,
+                "mapOptions": {"center": {"lat": 5.263234100000001, "lng": 100.4846227}, "fullscreenControl": true, "mapTypeControl": true, "streetViewControl": false, "zoom": 16, "zoomControl": true, "maxZoom": 20, "mapId": ""},
+                "mapsApiKey": "AIzaSyB5EO5leBaHOUmiSMyIjFfabL6an_kkSqE"
+            };
+
+            function initMap() {
+                // Get the latitude and longitude from the user input
+                var address = document.getElementById('addressInput').value;
+                var geocoder = new google.maps.Geocoder();
+                geocoder.geocode({'address': address}, function (results, status) {
+                    if (status === 'OK') {
+                        var location = results[0].geometry.location;
+                        var latitude = location.lat();
+                        var longitude = location.lng();
+
+                        // Update the latitude and longitude in the map options
+                        CONFIGURATION.mapOptions.center.lat = latitude;
+                        CONFIGURATION.mapOptions.center.lng = longitude;
+
+                        new NeighborhoodDiscovery(CONFIGURATION);
+                    }
+                });
+            }
+
+            function updateTextInput(val) {
+                document.getElementById('range').innerHTML = val;
+            }
+        </script>
+        <script id="nd-place-results-tmpl" type="text/x-handlebars-template">
+            {{#each places}}
+            <li class="place-result">
+            <div class="text">
+            <button class="name">{{name}}</button>
+            <div class="info">
+            {{#if rating}}
+            <span>{{rating}}</span>
+            <img src="https://fonts.gstatic.com/s/i/googlematerialicons/star/v15/24px.svg" alt="rating" class="star-icon"/>
+            {{/if}}
+            {{#if numReviews}}
+            <span>&nbsp;({{numReviews}})</span>
+            {{/if}}
+            {{#if priceLevel}}
+            &#183;&nbsp;<span>{{#each dollarSigns}}${{/each}}&nbsp;</span>
+            {{/if}}
+            </div>
+            <div class="info">{{type}}</div>
+            </div>
+            <button class="photo" style="background-image:url({{photos.0.urlSmall}})" aria-label="show photo in viewer"></button>
+            </li>
+            {{/each}}
+        </script>
+        <script id="nd-place-details-tmpl" type="text/x-handlebars-template">
+            <div class="navbar">
+            <button class="back-button">
+            <img class="icon" src="https://fonts.gstatic.com/s/i/googlematerialicons/arrow_back/v11/24px.svg" alt="back"/>
+            Back
+            </button>
+            </div>
+            <header>
+            <h2>{{name}}</h2>
+            <div class="info">
+            {{#if rating}}
+            <span class="star-rating-numeric">{{rating}}</span>
+            <span>
+            {{#each fullStarIcons}}
+            <img src="https://fonts.gstatic.com/s/i/googlematerialicons/star/v15/24px.svg" alt="full star" class="star-icon"/>
+            {{/each}}
+            {{#each halfStarIcons}}
+            <img src="https://fonts.gstatic.com/s/i/googlematerialicons/star_half/v17/24px.svg" alt="half star" class="star-icon"/>
+            {{/each}}
+            {{#each emptyStarIcons}}
+            <img src="https://fonts.gstatic.com/s/i/googlematerialicons/star_outline/v9/24px.svg" alt="empty star" class="star-icon"/>
+            {{/each}}
+            </span>
+            {{/if}}
+            {{#if numReviews}}
+            <a href="{{url}}" target="_blank">{{numReviews}} reviews</a>
+            {{else}}
+            <a href="{{url}}" target="_blank">See on Google Maps</a>
+            {{/if}}
+            {{#if priceLevel}}
+            &#183;
+            <span class="price-dollars">
+            {{#each dollarSigns}}${{/each}}
+            </span>
+            {{/if}}
+            </div>
+            {{#if type}}
+            <div class="info">{{type}}</div>
+            {{/if}}
+            </header>
+            <div class="section">
+            {{#if address}}
+            <div class="contact">
+            <img src="https://fonts.gstatic.com/s/i/googlematerialicons/place/v10/24px.svg" alt="Address" class="icon"/>
+            <div class="text">
+            {{address}}
+            </div>
+            </div>
+            {{/if}}
+            {{#if website}}
+            <div class="contact">
+            <img src="https://fonts.gstatic.com/s/i/googlematerialicons/public/v10/24px.svg" alt="Website" class="icon"/>
+            <div class="text">
+            <a href="{{website}}" target="_blank">{{websiteDomain}}</a>
+            </div>
+            </div>
+            {{/if}}
+            {{#if phoneNumber}}
+            <div class="contact">
+            <img src="https://fonts.gstatic.com/s/i/googlematerialicons/phone/v10/24px.svg" alt="Phone number" class="icon"/>
+            <div class="text">
+            {{phoneNumber}}
+            </div>
+            </div>
+            {{/if}}
+            {{#if openingHours}}
+            <div class="contact">
+            <img src="https://fonts.gstatic.com/s/i/googlematerialicons/schedule/v12/24px.svg" alt="Opening hours" class="icon"/>
+            <div class="text">
+            {{#each openingHours}}
+            <div>
+            <span class="weekday">{{days}}</span>
+            <span class="hours">{{hours}}</span>
+            </div>
+            {{/each}}
+            </div>
+            </div>
+            {{/if}}
+            </div>
+            {{#if photos}}
+            <div class="photos section">
+            {{#each photos}}
+            <button class="photo" style="background-image:url({{urlSmall}})" aria-label="show photo in viewer"></button>
+            {{/each}}
+            </div>
+            {{/if}}
+            {{#if reviews}}
+            <div class="reviews section">
+            <p class="attribution">Reviews by Google users</p>
+            {{#each reviews}}
+            <div class="review">
+            <a class="reviewer-identity" href="{{author_url}}" target="_blank">
+            <div class="reviewer-avatar" style="background-image:url({{profile_photo_url}})"></div>
+            <div class="reviewer-name">{{author_name}}</div>
+            </a>
+            <div class="rating info">
+            <span>
+            {{#each fullStarIcons}}
+            <img src="https://fonts.gstatic.com/s/i/googlematerialicons/star/v15/24px.svg" alt="full star" class="star-icon"/>
+            {{/each}}
+            {{#each halfStarIcons}}
+            <img src="https://fonts.gstatic.com/s/i/googlematerialicons/star_half/v17/24px.svg" alt="half star" class="star-icon"/>
+            {{/each}}
+            {{#each emptyStarIcons}}
+            <img src="https://fonts.gstatic.com/s/i/googlematerialicons/star_outline/v9/24px.svg" alt="empty star" class="star-icon"/>
+            {{/each}}
+            </span>
+            <span class="review-time">{{relative_time_description}}</span>
+            </div>
+            <div class="info">{{text}}</div>
+            </div>
+            {{/each}}
+            </div>
+            {{/if}}
+            {{#if html_attributions}}
+            <div class="section">
+            {{#each html_attributions}}
+            <p class="attribution">{{{this}}}</p>
+            {{/each}}
+            </div>
+            {{/if}}
+        </script>
+    </head>
+    <body onload="initAutocomplete()">
+        <div class="search-container">
+            <table>
+                <tr>
+                    <td rowspan="3" colspan="1" style="width: 500px; text-align: center;"><img src="image/logo.png" alt="logo" style="width:120px;padding:10px; margin-left:0px;"></td>
+                </tr>
+                <tr style="font-weight: bold;">                    
+                    <td rowspan="1" colspan="1" style="width:500px;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Location: </td>
+                    <td rowspan="1" colspan="1" style="width:2500px;">&nbsp;Type: </td>
+                    <td rowspan="1" colspan="1" style="width:500px;">Range(m): <span id="range">2500</span></td>
+                    <td rowspan="1" colspan="1"><div id="result"></div></td>     
+                </tr>
+                <tr>                   
+                    <td rowspan="1" colspan="1"><input type="text" id="addressInput" placeholder="Enter an address"> </td>
+                    <td rowspan="1" colspan="1" style="width:2500px;"><input type="radio" name="placeType" value="lodging"> Hotels / Airbnbs <input type="radio" name="placeType" value="restaurant"> Restaurants <input type="radio" name="placeType" value="tourist_attraction"> Attractions</td>
+                    <td rowspan="1" colspan="1">500&nbsp;<input type="range" id="radiusInput" min="500" max="10000" step="100" value="2500" onchange="updateTextInput(this.value);"/>&nbsp;10000</td>
+                    <td rowspan="1" colspan="1" style="text-align: center;"><button onclick="getNearbyPlaces()">Search</button> </td>
+                </tr>
+            </table>           
+        </div><br><br><br><br><br>
+        <div id="title" style="font-family: Roboto; text-align: center; background-image: url('image/forecast.jpg'); background-size: cover; color: white;"><br>
+            <h1 style="font-family: 'KentuckyFriedFont', cursive; color: white;">7 DAYS WEATHER FORECAST</h1><br>
+            <div id="weatherForecast"></div>
+            <br><br>
+        </div>
+
+        <div class="neighborhood-discovery">
+            <div class="places-panel panel no-scroll">
+                <header class="navbar">
+                    <div class="search-input">
+                        <input class="place-search-input" placeholder="Search nearby places">
+                        <button class="place-search-button">
+                            <img src="https://fonts.gstatic.com/s/i/googlematerialicons/search/v11/24px.svg" alt="search"/>
+                        </button>
+                    </div>
+                </header>
+                <div class="results">
+                    <ul class="place-results-list"></ul>
+                </div>
+                <button class="show-more-button sticky">
+                    <span>Show More</span>
+                    <img class="right" src="https://fonts.gstatic.com/s/i/googlematerialicons/expand_more/v11/24px.svg" alt="expand"/>
+                </button>
+            </div>
+            <div class="details-panel panel"></div>
+            <div class="map"></div>
+            <div class="photo-modal">
+                <img alt="place photo"/>
+                <div>
+                    <button class="back-button">
+                        <img class="icon" src="https://fonts.gstatic.com/s/i/googlematerialicons/arrow_back/v11/24px.svg" alt="back"/>
+                    </button>
+                    <div class="photo-text">
+                        <div class="photo-place"></div>
+                        <div class="photo-attrs">Photo by <span></span></div>
+                    </div>
+                </div>
+            </div>
+            <svg class="marker-pin" xmlns="http://www.w3.org/2000/svg" width="26" height="38" fill="none">
+            <path d="M13 0C5.817 0 0 5.93 0 13.267c0 7.862 5.59 10.81 9.555 17.624C12.09 35.248 11.342 38 13 38c1.723 0 .975-2.817 3.445-7.043C20.085 24.503 26 21.162 26 13.267 26 5.93 20.183 0 13 0Z"/>
+            </svg>
+        </div>
+        <div id="video" style="text-align: center; font-family: Roboto; font-weight: bold; font-size: 24px;">
+            <br><h1 style="font-family: 'KentuckyFriedFont', cursive; color: navy;"><b>WALKTHROUGH VIDEOS</b></h1><br>
+            <div class="container">
+                <div class="row">
+                    <div class="col-12 col-md-12 col-lg-12">
+                        <div id="videoContainer"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyB5EO5leBaHOUmiSMyIjFfabL6an_kkSqE&callback=initMap&libraries=places,geometry&solution_channel=GMP_QB_neighborhooddiscovery_v2_cADEF" async defer></script>
+    </body>
+</html>
