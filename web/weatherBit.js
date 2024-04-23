@@ -6,7 +6,7 @@ function fetchWeatherForecast() {
     const days = 7;
 
     // Fetch geolocation data using the Google Maps Geocoding API
-    fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=AIzaSyB5EO5leBaHOUmiSMyIjFfabL6an_kkSqE`)
+    fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=AIzaSyCdTWLRnEqSanEynmJ5aPujswtCXOpTQbc`)
             .then(response => response.json())
             .then(data => {
                 // Extract latitude and longitude from the geolocation data
